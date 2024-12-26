@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Andy's Chat v1</title>
+    <title>Andy's Chat</title>
     <style>
         body { font-family: sans-serif; margin: 20px; }
         #chat-area { border: 1px solid #ccc; padding: 10px; height: 300px; overflow-y: scroll; margin-bottom: 10px; }
@@ -33,65 +33,43 @@
         const localVideo = document.getElementById('local-video');
         const remoteVideo = document.getElementById('remote-video');
         let peer;
-        let stream;
+
+        function initPeer(initiator) {
+            peer = new SimplePeer({ initiator, trickle: false, stream });
+            peer.on('signal', signal => {
+                socket.emit(initiator ? 'offer' : 'answer', signal);
+            });
+            peer.on('stream', stream => {
+                remoteVideo.srcObject = stream;
+            });
+            peer.on('data', data => {
+                displayMessage("Other: " + data.toString());
+            });
+            peer.on('connect', () => {
+                console.log("Peer connected");
+            });
+        }
 
         navigator.mediaDevices.getUserMedia({ video: true, audio: true })
-            .then(mediaStream => {
-                stream = mediaStream;
+            .then(stream => {
                 localVideo.srcObject = stream;
+                socket.on('connect', () => console.log('Connected to signaling server.'));
 
-                socket.on('connect', () => {
-                    console.log('Connected to signaling server.');
-                });
-
-                socket.on('offer', (id, description) => {
-                    peer = new SimplePeer({ initiator: false, trickle: false, stream });
-
-                    peer.on('signal', signal => {
-                        socket.emit('answer', id, signal);
-                    });
-
-                    peer.on('stream', remoteStream => {
-                        remoteVideo.srcObject = remoteStream;
-                    });
-
-                    peer.on('data', data => {
-                        displayMessage("Other: " + data.toString());
-                    });
-
-                    peer.on('connect', () => {
-                        console.log("Peer connected");
-                    });
-
+                socket.on('offer', description => {
+                    initPeer(false);
                     peer.signal(description);
                 });
 
-                socket.on('answer', (id, description) => {
+                socket.on('answer', description => {
                     peer.signal(description);
                 });
 
-                socket.on('candidate', (id, candidate) => {
+                socket.on('candidate', candidate => {
                     peer.addIceCandidate(new RTCIceCandidate(candidate));
                 });
 
                 if (location.hash === '#init') {
-                    peer = new SimplePeer({ initiator: true, trickle: false, stream });
-
-                    peer.on('signal', signal => {
-                        socket.emit('offer', signal);
-                    });
-
-                    peer.on('stream', remoteStream => {
-                        remoteVideo.srcObject = remoteStream;
-                    });
-
-                    peer.on('data', data => {
-                        displayMessage("Other: " + data.toString());
-                    });
-
-                    peer.on('connect', () => {
-                        console.log("Peer connected");
-                    });
+                    initPeer(true);
                 }
             })
             .catch(error => console.error("Error accessing media devices:", error));
