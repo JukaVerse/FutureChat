@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Andy's Chat</title>
+    <title>Andy's P2P Chat</title>
     <style>
         body { font-family: sans-serif; margin: 20px; }
         #chat-area { border: 1px solid #ccc; padding: 10px; height: 300px; overflow-y: scroll; margin-bottom: 10px; }
@@ -12,7 +12,7 @@
 </head>
 <body>
 
-    <h1>Andy's Chat</h1>
+    <h1>Andy's P2P Chat</h1>
 
     <div id="chat-area"></div>
     <input type="text" id="message-input" placeholder="Type your message...">
@@ -23,54 +23,50 @@
         <video id="remote-video" autoplay playsinline></video>
     </div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
-    <script src="https://unpkg.com/simple-peer"></script>
+    <textarea id="offer" placeholder="Paste offer here..."></textarea>
+    <button onclick="createAnswer()">Create Answer</button>
+
+    <textarea id="answer" placeholder="Paste answer here..."></textarea>
+
+    <!-- Include Simple Peer from a CDN -->
+    <script src="https://unpkg.com/simple-peer@latest/simplepeer.min.js"></script>
 
     <script>
-        const socket = io(); // Connect to the signaling server
         const chatArea = document.getElementById('chat-area');
         const messageInput = document.getElementById('message-input');
         const localVideo = document.getElementById('local-video');
         const remoteVideo = document.getElementById('remote-video');
+        const offerTextarea = document.getElementById('offer');
+        const answerTextarea = document.getElementById('answer');
         let peer;
-
-        function initPeer(initiator) {
-            peer = new SimplePeer({ initiator, trickle: false, stream });
-            peer.on('signal', signal => {
-                socket.emit(initiator ? 'offer' : 'answer', signal);
-            });
-            peer.on('stream', stream => {
-                remoteVideo.srcObject = stream;
-            });
-            peer.on('data', data => {
-                displayMessage("Other: " + data.toString());
-            });
-            peer.on('connect', () => {
-                console.log("Peer connected");
-            });
-        }
+        let stream;
 
         navigator.mediaDevices.getUserMedia({ video: true, audio: true })
-            .then(stream => {
+            .then(mediaStream => {
+                stream = mediaStream;
                 localVideo.srcObject = stream;
-                socket.on('connect', () => console.log('Connected to signaling server.'));
+                
+                peer = new SimplePeer({ initiator: location.hash === '#init', trickle: false, stream });
 
-                socket.on('offer', description => {
-                    initPeer(false);
-                    peer.signal(description);
+                peer.on('signal', data => {
+                    if (peer.initiator) {
+                        offerTextarea.value = JSON.stringify(data);
+                    } else {
+                        answerTextarea.value = JSON.stringify(data);
+                    }
                 });
 
-                socket.on('answer', description => {
-                    peer.signal(description);
+                peer.on('stream', remoteStream => {
+                    remoteVideo.srcObject = remoteStream;
                 });
 
-                socket.on('candidate', candidate => {
-                    peer.addIceCandidate(new RTCIceCandidate(candidate));
+                peer.on('data', data => {
+                    displayMessage("Other: " + data.toString());
                 });
 
-                if (location.hash === '#init') {
-                    initPeer(true);
-                }
+                peer.on('connect', () => {
+                    console.log("Peer connected");
+                });
             })
             .catch(error => console.error("Error accessing media devices:", error));
 
@@ -93,6 +89,16 @@
             chatArea.appendChild(messageDiv);
             chatArea.scrollTop = chatArea.scrollHeight;
         }
+
+        function createAnswer() {
+            const offer = JSON.parse(offerTextarea.value);
+            peer.signal(offer);
+        }
+
+        answerTextarea.addEventListener('input', () => {
+            const answer = JSON.parse(answerTextarea.value);
+            peer.signal(answer);
+        });
     </script>
 
 </body>
