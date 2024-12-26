@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>WebRTC Chat</title>
+    <title>Andy Chat</title>
     <style>
         body { font-family: sans-serif; margin: 20px; }
         #chat-area { border: 1px solid #ccc; padding: 10px; height: 300px; overflow-y: scroll; margin-bottom: 10px; }
@@ -23,7 +23,8 @@
         <video id="remote-video" autoplay playsinline></video>
     </div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script> <script src="https://unpkg.com/simple-peer"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
+    <script src="https://unpkg.com/simple-peer"></script>
 
     <script>
         const socket = io(); // Connect to the signaling server
@@ -50,8 +51,11 @@
                         remoteVideo.srcObject = stream;
                     });
                     peer.on('connect', () => {
-                      console.log("Peer connected");
-                    })
+                        console.log("Peer connected");
+                    });
+                    peer.on('data', data => {
+                        displayMessage("Other: " + data.toString());
+                    });
                     peer.signal(description);
                 });
 
@@ -70,11 +74,14 @@
                         socket.emit('offer', signal);
                     });
                     peer.on('stream', stream => {
-                      remoteVideo.srcObject = stream;
+                        remoteVideo.srcObject = stream;
                     });
                     peer.on('connect', () => {
-                      console.log("Peer connected");
-                    })
+                        console.log("Peer connected");
+                    });
+                    peer.on('data', data => {
+                        displayMessage("Other: " + data.toString());
+                    });
                 }
 
             })
@@ -85,11 +92,10 @@
             if (message.trim() !== "") {
                 displayMessage("You: " + message);
                 messageInput.value = "";
-                // Send messages through the peer if connected
                 if (peer && peer.connected) {
-                  peer.send(message);
+                    peer.send(message);
                 } else {
-                  console.log("Not connected to peer yet")
+                    console.log("Not connected to peer yet");
                 }
             }
         }
@@ -99,11 +105,6 @@
             messageDiv.textContent = message;
             chatArea.appendChild(messageDiv);
             chatArea.scrollTop = chatArea.scrollHeight;
-        }
-        if (peer) {
-          peer.on('data', data => {
-            displayMessage("Other: " + data);
-          })
         }
     </script>
 
