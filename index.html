@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WebRTC Chat</title>
+    <style>
+        body { font-family: sans-serif; margin: 20px; }
+        #chat-area { border: 1px solid #ccc; padding: 10px; height: 300px; overflow-y: scroll; margin-bottom: 10px; }
+        #message-input { width: calc(100% - 22px); padding: 5px; border: 1px solid #ccc; box-sizing: border-box; }
+        #video-container { display: flex; justify-content: center; align-items: center; margin-top: 20px;}
+        #local-video, #remote-video { width: 320px; height: 240px; border: 1px solid black; margin: 10px; }
+    </style>
+</head>
+<body>
+
+    <h1>WebRTC Chat</h1>
+
+    <div id="chat-area"></div>
+    <input type="text" id="message-input" placeholder="Type your message...">
+    <button onclick="sendMessage()">Send</button>
+
+    <div id="video-container">
+        <video id="local-video" autoplay playsinline muted></video>
+        <video id="remote-video" autoplay playsinline></video>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script> <script src="https://unpkg.com/simple-peer"></script>
+
+    <script>
+        const socket = io(); // Connect to the signaling server
+        const chatArea = document.getElementById('chat-area');
+        const messageInput = document.getElementById('message-input');
+        const localVideo = document.getElementById('local-video');
+        const remoteVideo = document.getElementById('remote-video');
+        let peer;
+
+        navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+            .then(stream => {
+                localVideo.srcObject = stream;
+
+                socket.on('connect', () => {
+                    console.log('Connected to signaling server.');
+                });
+
+                socket.on('offer', (id, description) => {
+                    peer = new SimplePeer({ initiator: false, trickle: false, stream });
+                    peer.on('signal', signal => {
+                        socket.emit('answer', id, signal);
+                    });
+                    peer.on('stream', stream => {
+                        remoteVideo.srcObject = stream;
+                    });
+                    peer.on('connect', () => {
+                      console.log("Peer connected");
+                    })
+                    peer.signal(description);
+                });
+
+                socket.on('answer', (id, description) => {
+                    peer.signal(description);
+                });
+
+                socket.on('candidate', (id, candidate) => {
+                    peer.addIceCandidate(new RTCIceCandidate(candidate));
+                });
+
+                if (location.hash === '#init') {
+                    peer = new SimplePeer({ initiator: true, trickle: false, stream });
+
+                    peer.on('signal', signal => {
+                        socket.emit('offer', signal);
+                    });
+                    peer.on('stream', stream => {
+                      remoteVideo.srcObject = stream;
+                    });
+                    peer.on('connect', () => {
+                      console.log("Peer connected");
+                    })
+                }
+
+            })
+            .catch(error => console.error("Error accessing media devices:", error));
+
+        function sendMessage() {
+            const message = messageInput.value;
+            if (message.trim() !== "") {
+                displayMessage("You: " + message);
+                messageInput.value = "";
+                // Send messages through the peer if connected
+                if (peer && peer.connected) {
+                  peer.send(message);
+                } else {
+                  console.log("Not connected to peer yet")
+                }
+            }
+        }
+
+        function displayMessage(message) {
+            const messageDiv = document.createElement('div');
+            messageDiv.textContent = message;
+            chatArea.appendChild(messageDiv);
+            chatArea.scrollTop = chatArea.scrollHeight;
+        }
+        if (peer) {
+          peer.on('data', data => {
+            displayMessage("Other: " + data);
+          })
+        }
+    </script>
+
+</body>
+</html>
