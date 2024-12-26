@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Andy's Chat</title>
+    <title>Andy's Chat v1</title>
     <style>
         body { font-family: sans-serif; margin: 20px; }
         #chat-area { border: 1px solid #ccc; padding: 10px; height: 300px; overflow-y: scroll; margin-bottom: 10px; }
@@ -33,9 +33,11 @@
         const localVideo = document.getElementById('local-video');
         const remoteVideo = document.getElementById('remote-video');
         let peer;
+        let stream;
 
         navigator.mediaDevices.getUserMedia({ video: true, audio: true })
-            .then(stream => {
+            .then(mediaStream => {
+                stream = mediaStream;
                 localVideo.srcObject = stream;
 
                 socket.on('connect', () => {
@@ -49,8 +51,8 @@
                         socket.emit('answer', id, signal);
                     });
 
-                    peer.on('stream', stream => {
-                        remoteVideo.srcObject = stream;
+                    peer.on('stream', remoteStream => {
+                        remoteVideo.srcObject = remoteStream;
                     });
 
                     peer.on('data', data => {
@@ -79,8 +81,8 @@
                         socket.emit('offer', signal);
                     });
 
-                    peer.on('stream', stream => {
-                        remoteVideo.srcObject = stream;
+                    peer.on('stream', remoteStream => {
+                        remoteVideo.srcObject = remoteStream;
                     });
 
                     peer.on('data', data => {
@@ -91,7 +93,6 @@
                         console.log("Peer connected");
                     });
                 }
-
             })
             .catch(error => console.error("Error accessing media devices:", error));
 
@@ -114,11 +115,6 @@
             chatArea.appendChild(messageDiv);
             chatArea.scrollTop = chatArea.scrollHeight;
         }
-
-        // Ensure this handler is registered even if there's no peer connection initially
-        socket.on('data', data => {
-            displayMessage("Other: " + data);
-        });
     </script>
 
 </body>
