@@ -8,6 +8,7 @@
         #message-input { width: calc(100% - 22px); padding: 5px; border: 1px solid #ccc; box-sizing: border-box; }
         #video-container { display: flex; justify-content: center; align-items: center; margin-top: 20px; }
         #local-video, #remote-video { width: 320px; height: 240px; border: 1px solid black; margin: 10px; }
+        textarea { width: 100%; height: 100px; margin-top: 10px; }
     </style>
 </head>
 <body>
@@ -23,6 +24,11 @@
         <video id="remote-video" autoplay playsinline></video>
     </div>
 
+    <textarea id="offer" placeholder="Paste offer here..."></textarea>
+    <button onclick="createAnswer()">Create Answer</button>
+
+    <textarea id="answer" placeholder="Paste answer here..."></textarea>
+
     <!-- Include Simple Peer from a CDN -->
     <script src="https://unpkg.com/simple-peer@latest/simplepeer.min.js"></script>
 
@@ -31,45 +37,37 @@
         const messageInput = document.getElementById('message-input');
         const localVideo = document.getElementById('local-video');
         const remoteVideo = document.getElementById('remote-video');
+        const offerTextarea = document.getElementById('offer');
+        const answerTextarea = document.getElementById('answer');
         let peer;
         let stream;
-
-        // Function to initialize peer connection
-        function initPeer(initiator) {
-            peer = new SimplePeer({ initiator, trickle: false, stream });
-
-            peer.on('signal', data => {
-                console.log(JSON.stringify(data));
-                if (initiator) {
-                    // Share offer with the other peer manually or through some other means
-                    alert("Copy and share this offer: " + JSON.stringify(data));
-                } else {
-                    // Share answer with the other peer manually or through some other means
-                    alert("Copy and share this answer: " + JSON.stringify(data));
-                }
-            });
-
-            peer.on('stream', remoteStream => {
-                remoteVideo.srcObject = remoteStream;
-            });
-
-            peer.on('data', data => {
-                displayMessage("Other: " + data.toString());
-            });
-
-            peer.on('connect', () => {
-                console.log("Peer connected");
-            });
-        }
 
         navigator.mediaDevices.getUserMedia({ video: true, audio: true })
             .then(mediaStream => {
                 stream = mediaStream;
                 localVideo.srcObject = stream;
 
-                // Initialize peer based on hash in URL
-                const isInitiator = location.hash === '#init';
-                initPeer(isInitiator);
+                peer = new SimplePeer({ initiator: location.hash === '#init', trickle: false, stream });
+
+                peer.on('signal', data => {
+                    if (peer.initiator) {
+                        offerTextarea.value = JSON.stringify(data);
+                    } else {
+                        answerTextarea.value = JSON.stringify(data);
+                    }
+                });
+
+                peer.on('stream', remoteStream => {
+                    remoteVideo.srcObject = remoteStream;
+                });
+
+                peer.on('data', data => {
+                    displayMessage("Other: " + data.toString());
+                });
+
+                peer.on('connect', () => {
+                    console.log("Peer connected");
+                });
             })
             .catch(error => console.error("Error accessing media devices:", error));
 
@@ -92,6 +90,16 @@
             chatArea.appendChild(messageDiv);
             chatArea.scrollTop = chatArea.scrollHeight;
         }
+
+        function createAnswer() {
+            const offer = JSON.parse(offerTextarea.value);
+            peer.signal(offer);
+        }
+
+        answerTextarea.addEventListener('input', () => {
+            const answer = JSON.parse(answerTextarea.value);
+            peer.signal(answer);
+        });
     </script>
 
 </body>
